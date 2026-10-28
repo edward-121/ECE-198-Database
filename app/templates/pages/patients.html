@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Patients</h1>
+<table>
+  <tr><th>ID</th><th>First</th><th>Last</th></tr>
+  {% for p in patients %}
+  <tr><td>{{ p.patient_id }}</td><td>{{ p.first_name }}</td><td>{{ p.last_name }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

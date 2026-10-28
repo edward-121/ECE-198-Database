@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Add Patient</h1>
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <p>{{ form.first_name.label }} {{ form.first_name() }}</p>
+  <p>{{ form.last_name.label }} {{ form.last_name() }}</p>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
