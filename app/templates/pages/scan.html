@@ -3,6 +3,9 @@
 {% block content %}
 <div class="form-page">
     <h1>Key Fob Scanner</h1>
+    <p>Connect the Arduino reader over USB to scan a registered 7-byte fob.</p>
+    <button class="button" type="button" id="connect-reader">Connect Arduino reader</button>
+    <p id="reader-status" role="status" aria-live="polite">Reader not connected.</p>
     <form method="POST">
         {{ form.hidden_tag() }}
         <p>{{ form.key_fob_id.label }} {{ form.key_fob_id() }} <button type="submit">Scan</button></p>
@@ -27,5 +30,123 @@ LCD 20x4:
     {% elif form.key_fob_id.data %}
         <p class="error-message">Fob not found.</p>
     {% endif %}
+    <div id="reader-result" class="scan-result" hidden>
+        <h2 id="reader-patient"></h2>
+        <p id="reader-fob"></p>
+        <pre id="reader-lcd" class="lcd-preview"></pre>
+    </div>
 </div>
+<script>
+(() => {
+    const connectButton = document.getElementById("connect-reader");
+    const status = document.getElementById("reader-status");
+    const result = document.getElementById("reader-result");
+    const encoder = new TextEncoder();
+
+    if (!("serial" in navigator)) {
+        status.textContent = "Web Serial is unavailable. Use a supported Chromium browser over localhost or HTTPS.";
+        connectButton.disabled = true;
+        return;
+    }
+
+    function serialField(value, maxLength) {
+        return String(value || "")
+            .replace(/[|\r\n\t]/g, " ")
+            .replace(/[^\x20-\x7E]/g, "")
+            .slice(0, maxLength) || "No exercise";
+    }
+
+    async function sendToReader(writer, value) {
+        await writer.write(encoder.encode(value + "\n"));
+    }
+
+    function showPatient(data) {
+        document.getElementById("reader-patient").textContent = `Scanned: ${data.patient_name}`;
+        document.getElementById("reader-fob").textContent = `Fob UID: ${data.key_fob_id}`;
+        document.getElementById("reader-lcd").textContent =
+            `LCD 16x2:\n|${data.lcd_16x2[0]}|\n|${data.lcd_16x2[1]}|\n\n` +
+            `LCD 20x4:\n|${data.lcd_20x4.join("|\n|")}|\n`;
+        result.hidden = false;
+    }
+
+    async function handleUid(uid, writer) {
+        if (!/^[0-9a-fA-F]{14}$/.test(uid)) {
+            status.textContent = `Ignoring invalid reader data: ${uid}`;
+            return;
+        }
+
+        const normalizedUid = uid.toUpperCase();
+        status.textContent = `Looking up fob ${normalizedUid}…`;
+        try {
+            const response = await fetch(`/api/scan/${encodeURIComponent(normalizedUid)}`);
+            const data = await response.json();
+            if (!response.ok) {
+                await sendToReader(writer, "E|Unknown fob");
+                status.textContent = `No patient is registered for fob ${normalizedUid}.`;
+                result.hidden = true;
+                return;
+            }
+
+            const exerciseNames = data.exercises.slice(0, 3).map((exercise) =>
+                serialField(exercise.name, 32)
+            );
+            while (exerciseNames.length < 3) {
+                exerciseNames.push("No exercise");
+            }
+            const patientName = serialField(data.patient_name, 24);
+            await sendToReader(writer, ["P", patientName, ...exerciseNames].join("|"));
+            showPatient(data);
+            status.textContent = `Loaded ${data.patient_name} from the database.`;
+        } catch (error) {
+            await sendToReader(writer, "E|Database unavailable");
+            status.textContent = `Database lookup failed: ${error.message}`;
+        }
+    }
+
+    connectButton.addEventListener("click", async () => {
+        let port;
+        let reader;
+        let writer;
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            reader = port.readable.getReader();
+            writer = port.writable.getWriter();
+            connectButton.disabled = true;
+            status.textContent = "Reader connected. Scan a registered fob.";
+
+            const decoder = new TextDecoder();
+            let pending = "";
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                    break;
+                }
+                pending += decoder.decode(value, { stream: true });
+                const lines = pending.split(/\r?\n/);
+                pending = lines.pop();
+                for (const line of lines) {
+                    const uid = line.trim();
+                    if (uid) {
+                        await handleUid(uid, writer);
+                    }
+                }
+            }
+        } catch (error) {
+            status.textContent = `Reader connection failed: ${error.message}`;
+        } finally {
+            if (reader) {
+                reader.releaseLock();
+            }
+            if (writer) {
+                writer.releaseLock();
+            }
+            if (port?.readable || port?.writable) {
+                await port.close();
+            }
+            connectButton.disabled = false;
+        }
+    });
+})();
+</script>
 {% endblock %}

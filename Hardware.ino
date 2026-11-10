@@ -12,24 +12,8 @@ rgb_lcd lcd;
 
 const uint8_t EX_COUNT = 3;     // exercises per user
 
-struct User {
-  uint64_t tag;                 // 7-byte UID fits in 64 bits
-  char* name;
-  char* exercises[3];
-};
-
-// Replace these placeholder tags with your real 7-byte card UIDs.
-// Unknown cards show their hex UID on the LCD so you can copy it from there.
-// Write them as 14 hex digits with the ULL suffix.
-
-User users[] = {
-  {0x040EE5429E6180, "Daniel",   {"Jumping Jacks", "Squats", "One mile"}},
-  {0x045c88459E6181, "Ethan",    {"Bicep Curls", "Hopscotch", "1 hour walk"}},
-  {0x045FF518CD2A81, "Mohammed", {"2 minute sprint", "Jumps", "Leg curls"}},
-  {0x04919D20CA2A81, "Edward",   {"Bench press", "Push ups", "Pullups"}},
-  {0x044CB8499E6180, "Jonah",    {"Dips", "Tricep extensions", "Diamond pushups"}},
-};
-const uint8_t USER_COUNT = sizeof(users) / sizeof(users[0]);
+char patientName[25];
+char exercises[EX_COUNT][33];
 
 void showReady() {
   lcd.clear();
@@ -46,24 +30,24 @@ void printUid(const uint8_t* bytes, uint8_t len) {
 }
 
 // Draws one exercise: name + position on top, exercise on the bottom
-void showExercise(const User* u, uint8_t idx) {
+void showExercise(uint8_t idx) {
   lcd.clear();
-  lcd.print(u->name);
+  lcd.print(patientName);
   lcd.setCursor(12, 0);
   lcd.print(idx + 1);
   lcd.print("/");
   lcd.print(EX_COUNT);
   lcd.setCursor(0, 1);
-  lcd.print(u->exercises[idx]);
+  lcd.print(exercises[idx]);
 }
 
 // Pot picks the exercise, button exits
-void browseExercises(const User* u) {
+void browseExercises() {
   lcd.setRGB(0, 255, 0);
 
   int raw = analogRead(POT_PIN);
   uint8_t idx = constrain((long)raw * EX_COUNT / 1024, 0, EX_COUNT - 1);
-  showExercise(u, idx);
+  showExercise(idx);
 
   while (true) {
     // Button pressed (wired to GND, so LOW = pressed)
@@ -85,16 +69,67 @@ void browseExercises(const User* u) {
       long zoneEnd   = (long)(newIdx + 1) * 1024 / EX_COUNT;
       if (raw > zoneStart + 15 && raw < zoneEnd - 15) {
         idx = newIdx;
-        showExercise(u, idx);
+        showExercise(idx);
       }
     }
     delay(20);
   }
 }
 
+bool receivePatientData() {
+  lcd.clear();
+  lcd.setRGB(255, 165, 0);
+  lcd.print("Looking up fob...");
+
+  uint32_t started = millis();
+  while (millis() - started < 15000) {
+    if (!Serial.available()) continue;
+
+    String response = Serial.readStringUntil('\n');
+    response.trim();
+    if (response.startsWith("E|")) {
+      lcd.clear();
+      lcd.setRGB(255, 0, 0);
+      lcd.print(response.substring(2));
+      delay(2500);
+      return false;
+    }
+    if (!response.startsWith("P|")) continue;
+
+    String fields[5];
+    int start = 0;
+    bool complete = true;
+    for (uint8_t i = 0; i < 5; i++) {
+      int separator = response.indexOf('|', start);
+      if (i == 4) separator = response.length();
+      if (separator < 0) {
+        complete = false;
+        break;
+      }
+      fields[i] = response.substring(start, separator);
+      start = separator + 1;
+    }
+    if (!complete) continue;
+
+    fields[1].toCharArray(patientName, sizeof(patientName));
+    for (uint8_t i = 0; i < EX_COUNT; i++) {
+      fields[i + 2].toCharArray(exercises[i], sizeof(exercises[i]));
+    }
+    return true;
+  }
+
+  lcd.clear();
+  lcd.setRGB(255, 0, 0);
+  lcd.print("No database reply");
+  delay(2500);
+  return false;
+}
+
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
+  Serial.begin(115200);
+  Serial.setTimeout(15000);
   lcd.begin(16, 2);
   nfc.begin();
 
@@ -134,39 +169,20 @@ void loop() {
     return;
   }
 
-  // Pack the 7 bytes into one 64-bit number
-  uint64_t uid = 0;
+  // Send the complete UID to the scan page, which looks it up in SQLite.
   for (uint8_t i = 0; i < 7; i++) {
-    uid = (uid << 8) | uidBytes[i];
+    if (uidBytes[i] < 0x10) Serial.print("0");
+    Serial.print(uidBytes[i], HEX);
   }
+  Serial.println();
 
-  // Look up the user
-  User* match = nullptr;
-  for (uint8_t i = 0; i < USER_COUNT; i++) {
-    if (users[i].tag == uid) {
-      match = &users[i];
-      break;
-    }
-  }
-
-  if (match) {
-    // Greeting
+  if (receivePatientData()) {
     lcd.clear();
-    lcd.setRGB(0, 255, 0);      // green = known user
+    lcd.setRGB(0, 255, 0);
     lcd.print("Hi ");
-    lcd.print(match->name);
+    lcd.print(patientName);
     delay(1500);
-
-    // Scroll with the pot until the button is pressed
-    browseExercises(match);
-  } else {
-    lcd.clear();
-    lcd.setRGB(255, 0, 0);      // red = unknown card
-    lcd.print("Unknown card");
-    lcd.setCursor(0, 1);
-    printUid(uidBytes, uidLength);
-    delay(3000);
+    browseExercises();
   }
-
   showReady();
 }

@@ -2,11 +2,21 @@ from flask import Blueprint, render_template, redirect, url_for, jsonify, reques
 from .extensions import db
 from .models import Appointment, Patient, PrescribedExercise, SessionHistory
 from .forms import (
-    AppointmentForm, FobScanForm, PatientForm, PrescribedExerciseForm,
-    SessionHistoryForm,
+    AppointmentForm, FobAssignmentForm, FobScanForm, PatientForm,
+    PrescribedExerciseForm, SessionHistoryForm,
 )
 
 pages = Blueprint("pages", __name__)
+
+
+def _normalize_fob_id(fob_id):
+    clean_fob = fob_id.strip().upper()
+    if len(clean_fob) not in {4, 14} or any(
+        character not in "0123456789ABCDEF" for character in clean_fob
+    ):
+        return None
+    return clean_fob
+
 
 @pages.route("/")
 def home():
@@ -47,6 +57,29 @@ def patients():
 def patient_detail(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     return render_template("pages/patient_detail.html", patient=patient)
+
+
+@pages.route("/patient/<int:patient_id>/fob", methods=["GET", "POST"])
+def assign_fob(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    form = FobAssignmentForm()
+    if form.validate_on_submit():
+        fob_code = form.key_fob_id.data.strip().upper()
+        existing = Patient.query.filter(
+            db.func.upper(Patient.key_fob_id) == fob_code,
+            Patient.id != patient.id,
+        ).first()
+        if existing:
+            form.key_fob_id.errors.append("Key Fob ID is already assigned to another patient.")
+        else:
+            patient.key_fob_id = fob_code
+            db.session.commit()
+            flash("Key fob assigned to patient.", "success")
+            return redirect(url_for("pages.patient_detail", patient_id=patient.id))
+    elif request.method == "GET":
+        form.key_fob_id.data = patient.key_fob_id
+    return render_template("pages/assign_fob.html", form=form, patient=patient)
+
 
 @pages.route("/patients/add", methods=["GET", "POST"])
 def add_patient():
@@ -138,11 +171,13 @@ def scan():
     form = FobScanForm()
     scanned_patient = None
     lcd_data = None
-    fob_input = request.args.get("fob", "").strip().upper()
+    fob_input = _normalize_fob_id(request.args.get("fob", ""))
 
     if fob_input:
         form.key_fob_id.data = fob_input
-        scanned_patient = Patient.query.filter(Patient.key_fob_id.ilike(fob_input)).first()
+        scanned_patient = Patient.query.filter(
+            db.func.upper(Patient.key_fob_id) == fob_input
+        ).first()
         if scanned_patient:
             lcd_data = scanned_patient.to_lcd_dict()
 
@@ -154,8 +189,12 @@ def scan():
 
 @pages.route("/api/scan/<fob_id>", methods=["GET"])
 def api_scan_fob(fob_id):
-    clean_fob = fob_id.strip().upper()
-    patient = Patient.query.filter(Patient.key_fob_id.ilike(clean_fob)).first()
+    clean_fob = _normalize_fob_id(fob_id)
+    if clean_fob is None:
+        return jsonify({"status": "error", "message": "Invalid fob ID"}), 400
+    patient = Patient.query.filter(
+        db.func.upper(Patient.key_fob_id) == clean_fob
+    ).first()
     if not patient:
         return jsonify({"status": "error", "message": "Not found"}), 404
     res = patient.to_lcd_dict()

@@ -5,6 +5,7 @@
 <h1>{{ patient.first_name }} {{ patient.last_name }}</h1>
 <p class="muted">
   Key fob <code>{{ patient.key_fob_id }}</code>
+  <a href="{{ url_for('pages.assign_fob', patient_id=patient.id) }}">Change fob</a>
   &middot; Age {{ patient.age if patient.age is not none else 'not provided' }}
   &middot; {{ patient.gender or 'Gender not provided' }}
 </p>

@@ -6,7 +6,7 @@
     <form method="POST">
         {{ form.hidden_tag() }}
         <div class="form-field">
-            <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20) }}</p>
+            <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20, placeholder="e.g. A1B2 or 040EE5429E6180") }}</p>
             {% for error in form.key_fob_id.errors %}<span class="errors">{{ error }}</span>{% endfor %}
         </div>
         <div class="form-row">

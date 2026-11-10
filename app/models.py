@@ -5,7 +5,7 @@ class Patient(db.Model):
     __tablename__ = "patient_list"
 
     id = db.Column(db.Integer, primary_key=True)
-    key_fob_id = db.Column(db.String(4), unique=True, nullable=False, index=True)
+    key_fob_id = db.Column(db.String(14), unique=True, nullable=False, index=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=True)
