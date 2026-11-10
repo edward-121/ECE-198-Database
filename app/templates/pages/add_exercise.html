@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Exercise Prescription{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pages.patient_detail', patient_id=patient.id) }}">&larr; Back to {{ patient.first_name }}'s record</a></p>
+<h1>Add exercise prescription</h1>
+<p class="muted">For {{ patient.first_name }} {{ patient.last_name }}. Enter either a duration or both sets and reps.</p>
+<form class="card" method="POST">
+  {{ form.hidden_tag() }}
+  {% for field in [form.name, form.category, form.duration_minutes, form.intensity, form.sets, form.reps, form.frequency, form.instructions] %}
+    <p>
+      {{ field.label }}<br>
+      {% if field.name == 'instructions' %}{{ field(rows=4, cols=60) }}{% else %}{{ field() }}{% endif %}
+      {% for error in field.errors %}<span class="errors">{{ error }}</span>{% endfor %}
+    </p>
+  {% endfor %}
+  <button class="button" type="submit">Save prescription</button>
+  <a class="button secondary" href="{{ url_for('pages.patient_detail', patient_id=patient.id) }}">Cancel</a>
+</form>
+{% endblock %}

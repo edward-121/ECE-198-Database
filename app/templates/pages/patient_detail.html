@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.first_name }} {{ patient.last_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pages.patients') }}">&larr; All patients</a></p>
+<h1>{{ patient.first_name }} {{ patient.last_name }}</h1>
+<p class="muted">
+  Key fob <code>{{ patient.key_fob_id }}</code>
+  &middot; Age {{ patient.age if patient.age is not none else 'not provided' }}
+  &middot; {{ patient.gender or 'Gender not provided' }}
+</p>
+
+<section class="grid">
+  <div class="card">
+    <h2>Assessment &amp; health details</h2>
+    <h3>Initial assessment</h3>
+    <p>{{ patient.initial_assessment or 'No assessment recorded.' }}</p>
+    <h3>Health details</h3>
+    <p>{{ patient.health_details or 'No health details recorded.' }}</p>
+    <h3>General notes</h3>
+    <p>{{ patient.notes or 'No general notes.' }}</p>
+  </div>
+  <div class="card">
+    <h2>Exercise prescription</h2>
+    {% if patient.prescribed_exercises %}
+      {% for e in patient.prescribed_exercises %}
+      <article class="record-entry">
+        <h3>{{ e.name }} <span class="muted">({{ e.category or 'Other' }})</span></h3>
+        <p>
+          {% if e.duration_minutes %}<strong>{{ e.duration_minutes }} min</strong>{% endif %}
+          {% if e.sets and e.reps %}{% if e.duration_minutes %}&middot; {% endif %}<strong>{{ e.sets }} sets &times; {{ e.reps }} reps</strong>{% endif %}
+          {% if e.intensity %}&middot; {{ e.intensity }}{% endif %}
+        </p>
+        <p><strong>Frequency:</strong> {{ e.frequency }}</p>
+        {% if e.instructions %}<p>{{ e.instructions }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    {% else %}
+      <p>No exercises prescribed yet.</p>
+    {% endif %}
+    <a class="button" href="{{ url_for('pages.add_exercise', patient_id=patient.id) }}">Add exercise prescription</a>
+  </div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h2>Exercise session history <span class="muted">({{ patient.sessions|length }})</span></h2>
+    <p><a class="button" href="{{ url_for('pages.add_session', patient_id=patient.id) }}">Log a session</a></p>
+    {% if patient.sessions %}
+      {% for s in patient.sessions %}
+      <article class="record-entry spaced">
+        <h3>{{ s.date.strftime('%b %d, %Y at %I:%M %p') }}</h3>
+        <p><strong>Warm-up:</strong> {{ s.warmup or 'Not recorded' }}</p>
+        <p><strong>Cardio:</strong> {{ s.cardio or 'Not recorded' }}</p>
+        <p><strong>Cool-down:</strong> {{ s.cooldown or 'Not recorded' }}</p>
+        {% if s.notes %}<p><strong>Notes:</strong> {{ s.notes }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    {% else %}
+      <p>No sessions logged yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Appointment history <span class="muted">({{ patient.appointments|length }})</span></h2>
+    <p><a class="button" href="{{ url_for('pages.add_appointment', patient_id=patient.id) }}">Add appointment</a></p>
+    {% if patient.appointments %}
+      {% for a in patient.appointments %}
+      <article class="record-entry spaced">
+        <h3>{{ a.appointment_date.strftime('%b %d, %Y at %I:%M %p') }}</h3>
+        <p>{{ a.notes }}</p>
+      </article>
+      {% endfor %}
+    {% else %}
+      <p>No appointments recorded yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Fob Scanner{% endblock %}
+{% block content %}
+<div class="form-page">
+    <h1>Key Fob Scanner</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <p>{{ form.key_fob_id.label }} {{ form.key_fob_id() }} <button type="submit">Scan</button></p>
+    </form>
+
+    {% if scanned_patient %}
+        <div class="scan-result">
+            <h2>Scanned: {{ scanned_patient.first_name }} {{ scanned_patient.last_name }}</h2>
+            <h3>LCD Simulation</h3>
+            <pre class="lcd-preview">
+LCD 16x2:
+|{{ lcd_data.lcd_16x2[0] }}|
+|{{ lcd_data.lcd_16x2[1] }}|
+
+LCD 20x4:
+|{{ lcd_data.lcd_20x4[0] }}|
+|{{ lcd_data.lcd_20x4[1] }}|
+|{{ lcd_data.lcd_20x4[2] }}|
+|{{ lcd_data.lcd_20x4[3] }}|
+            </pre>
+        </div>
+    {% elif form.key_fob_id.data %}
+        <p class="error-message">Fob not found.</p>
+    {% endif %}
+</div>
+{% endblock %}

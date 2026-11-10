@@ -1,10 +1,24 @@
 {% extends "base.html" %}
+{% block title %}Add Patient{% endblock %}
 {% block content %}
-<h1>Add Patient</h1>
-<form method="POST">
-  {{ form.hidden_tag() }}
-  <p>{{ form.first_name.label }} {{ form.first_name() }}</p>
-  <p>{{ form.last_name.label }} {{ form.last_name() }}</p>
-  <button type="submit">Save</button>
-</form>
+<div class="form-page narrow">
+    <h1>Add New Patient</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="form-field">
+            <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20) }}</p>
+            {% for error in form.key_fob_id.errors %}<span class="errors">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="form-row">
+            <p>{{ form.first_name.label }}<br>{{ form.first_name() }}</p>
+            <p>{{ form.last_name.label }}<br>{{ form.last_name() }}</p>
+        </div>
+        <p>{{ form.age.label }}<br>{{ form.age() }}</p>
+        <p>{{ form.gender.label }}<br>{{ form.gender() }}</p>
+        <p>{{ form.initial_assessment.label }}<br>{{ form.initial_assessment(cols=50, rows=3) }}</p>
+        <p>{{ form.health_details.label }}<br>{{ form.health_details(cols=50, rows=3) }}</p>
+        <p>{{ form.notes.label }}<br>{{ form.notes(cols=50, rows=3) }}</p>
+        <button class="button" type="submit">Save Patient</button>
+    </form>
+</div>
 {% endblock %}
