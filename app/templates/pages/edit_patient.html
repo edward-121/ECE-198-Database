@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ patient.first_name }} {{ patient.last_name }}{% endblock %}
+{% block content %}
+<div class="form-page narrow">
+    <p><a href="{{ url_for('pages.patient_detail', patient_id=patient.id) }}">&larr; Back to patient</a></p>
+    <h1>Edit Patient</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="form-field">
+            <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20) }}</p>
+            {% for error in form.key_fob_id.errors %}<span class="errors">{{ error }}</span>{% endfor %}
+        </div>
+        <div class="form-row">
+            <p>{{ form.first_name.label }}<br>{{ form.first_name() }}</p>
+            <p>{{ form.last_name.label }}<br>{{ form.last_name() }}</p>
+        </div>
+        <p>{{ form.age.label }}<br>{{ form.age() }}</p>
+        <p>{{ form.gender.label }}<br>{{ form.gender() }}</p>
+        <p>{{ form.initial_assessment.label }}<br>{{ form.initial_assessment(cols=50, rows=3) }}</p>
+        <p>{{ form.health_details.label }}<br>{{ form.health_details(cols=50, rows=3) }}</p>
+        <p>{{ form.notes.label }}<br>{{ form.notes(cols=50, rows=3) }}</p>
+        <button class="button" type="submit">Save Changes</button>
+    </form>
+</div>
+{% endblock %}

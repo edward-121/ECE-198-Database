@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Assign Fob - {{ patient.first_name }} {{ patient.last_name }}{% endblock %}
+{% block content %}
+<div class="form-page narrow">
+    <p><a href="{{ url_for('pages.patient_detail', patient_id=patient.id) }}">&larr; Back to patient</a></p>
+    <h1>Assign Key Fob</h1>
+    <p>Enter the 14-character UID read from the Arduino card, or keep using a 4-character legacy ID.</p>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="form-field">
+            <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20, placeholder="e.g. 040EE5429E6180") }}</p>
+            {% for error in form.key_fob_id.errors %}<span class="errors">{{ error }}</span>{% endfor %}
+        </div>
+        <button class="button" type="submit">{{ form.submit.label.text }}</button>
+    </form>
+</div>
+{% endblock %}
