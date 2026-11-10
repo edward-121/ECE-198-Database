@@ -93,7 +93,7 @@ LCD 20x4:
             while (exerciseNames.length < 3) {
                 exerciseNames.push("No exercise");
             }
-            const patientName = serialField(data.patient_name, 24);
+            const patientName = serialField(data.patient_name.split(" ")[0], 24);
             await sendToReader(writer, ["P", patientName, ...exerciseNames].join("|"));
             showPatient(data);
             status.textContent = `Loaded ${data.patient_name} from the database.`;

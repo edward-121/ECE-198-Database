@@ -74,6 +74,12 @@ class Patient(db.Model):
         }
 
 
+class SeedMarker(db.Model):
+    __tablename__ = "seed_marker"
+
+    key = db.Column(db.String(100), primary_key=True)
+
+
 class PrescribedExercise(db.Model):
     __tablename__ = "prescribed_exercise"
     id = db.Column(db.Integer, primary_key=True)

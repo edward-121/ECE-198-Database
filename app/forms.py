@@ -94,3 +94,7 @@ class FobScanForm(FlaskForm):
 class FobAssignmentForm(FlaskForm):
     key_fob_id = StringField("Key Fob Hex ID (4 or 14 digits)", validators=FOB_ID_VALIDATORS)
     submit = SubmitField("Save Fob ID")
+
+
+class DeletePatientForm(FlaskForm):
+    pass

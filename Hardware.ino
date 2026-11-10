@@ -31,14 +31,20 @@ void printUid(const uint8_t* bytes, uint8_t len) {
 
 // Draws one exercise: name + position on top, exercise on the bottom
 void showExercise(uint8_t idx) {
+  char header[17];
+  snprintf(header, sizeof(header), "%.12s %u/%u", patientName, idx + 1, EX_COUNT);
   lcd.clear();
-  lcd.print(patientName);
-  lcd.setCursor(12, 0);
-  lcd.print(idx + 1);
-  lcd.print("/");
-  lcd.print(EX_COUNT);
+  lcd.setCursor(0, 0);
+  lcd.print(header);
   lcd.setCursor(0, 1);
-  lcd.print(exercises[idx]);
+  uint8_t length = 0;
+  while (length < 16 && exercises[idx][length]) {
+    lcd.print(exercises[idx][length]);
+    length++;
+  }
+  for (uint8_t i = length; i < 16; i++) {
+    lcd.print(" ");
+  }
 }
 
 // Pot picks the exercise, button exits
@@ -76,7 +82,7 @@ void browseExercises() {
   }
 }
 
-bool receivePatientData() {
+bool receivePatientData(const uint8_t* uidBytes, uint8_t uidLength) {
   lcd.clear();
   lcd.setRGB(255, 165, 0);
   lcd.print("Looking up fob...");
@@ -90,7 +96,13 @@ bool receivePatientData() {
     if (response.startsWith("E|")) {
       lcd.clear();
       lcd.setRGB(255, 0, 0);
-      lcd.print(response.substring(2));
+      if (response == "E|Unknown fob") {
+        lcd.print("Unknown fob");
+        lcd.setCursor(0, 1);
+        printUid(uidBytes, uidLength);
+      } else {
+        lcd.print(response.substring(2));
+      }
       delay(2500);
       return false;
     }
@@ -176,11 +188,13 @@ void loop() {
   }
   Serial.println();
 
-  if (receivePatientData()) {
+  if (receivePatientData(uidBytes, uidLength)) {
     lcd.clear();
     lcd.setRGB(0, 255, 0);
     lcd.print("Hi ");
-    lcd.print(patientName);
+    for (uint8_t i = 0; i < 13 && patientName[i]; i++) {
+      lcd.print(patientName[i]);
+    }
     delay(1500);
     browseExercises();
   }
