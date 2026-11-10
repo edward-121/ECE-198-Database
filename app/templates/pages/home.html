@@ -1,2 +1,18 @@
 {% extends "base.html" %}
-{% block content %}<h1>Welcome</h1>{% endblock %}
+{% block title %}Exercise Care Records{% endblock %}
+{% block content %}
+<h1>Exercise care records</h1>
+<p class="muted">Patient-centered exercise prescriptions, session logs, and appointment history.</p>
+<div class="grid">
+  <div class="card">
+    <h2>{{ patients|length }} patient{{ '' if patients|length == 1 else 's' }}</h2>
+    <p>Each patient record brings their plan, exercise history, and appointments together.</p>
+    <a class="button" href="{{ url_for('pages.patients') }}">Open patient records</a>
+  </div>
+  <div class="card">
+    <h2>Get started</h2>
+    <p>Add a patient and connect their four-character key fob to their record.</p>
+    <a class="button secondary" href="{{ url_for('pages.add_patient') }}">Add a patient</a>
+  </div>
+</div>
+{% endblock %}

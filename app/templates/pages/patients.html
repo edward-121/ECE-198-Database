@@ -1,10 +1,26 @@
 {% extends "base.html" %}
+{% block title %}Patients{% endblock %}
 {% block content %}
 <h1>Patients</h1>
-<table>
-  <tr><th>ID</th><th>First</th><th>Last</th></tr>
-  {% for p in patients %}
-  <tr><td>{{ p.patient_id }}</td><td>{{ p.first_name }}</td><td>{{ p.last_name }}</td></tr>
-  {% endfor %}
-</table>
+<p class="muted">Open a patient record to see their exercise plan, session log, and appointment history together.</p>
+<p><a class="button" href="{{ url_for('pages.add_patient') }}">Add patient</a></p>
+<div class="card">
+  {% if patients %}
+  <table>
+    <thead><tr><th>Patient</th><th>Key fob</th><th>Age</th><th>Record</th></tr></thead>
+    <tbody>
+      {% for p in patients %}
+      <tr>
+        <td>{{ p.first_name }} {{ p.last_name }}</td>
+        <td><code>{{ p.key_fob_id }}</code></td>
+        <td>{{ p.age if p.age is not none else 'Not provided' }}</td>
+        <td><a href="{{ url_for('pages.patient_detail', patient_id=p.id) }}">Open complete record</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No patients have been added yet.</p>
+  {% endif %}
+</div>
 {% endblock %}
