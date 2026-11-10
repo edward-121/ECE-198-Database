@@ -5,6 +5,25 @@
 <p class="muted">Open a patient record to see their exercise plan, session log, and appointment history together.</p>
 <p><a class="button" href="{{ url_for('pages.add_patient') }}">Add patient</a></p>
 <div class="card">
+  <form method="get" action="{{ url_for('pages.patients') }}" class="grid patients-controls">
+    <div>
+      <label for="patient-search">Search patients</label><br>
+      <input class="patient-search" id="patient-search" type="search" name="q" value="{{ search }}" placeholder="Name or key fob">
+    </div>
+    <div>
+      <label for="sort-patients">Sort by</label><br>
+      <select id="sort-patients" name="sort">
+        <option value="last_name" {% if sort_by == 'last_name' %}selected{% endif %}>Last name</option>
+        <option value="first_name" {% if sort_by == 'first_name' %}selected{% endif %}>First name</option>
+      </select>
+    </div>
+    <div>
+      <button class="button" type="submit">Search / sort</button>
+      {% if search or sort_by != 'last_name' %}
+      <a class="button secondary" href="{{ url_for('pages.patients') }}">Clear</a>
+      {% endif %}
+    </div>
+  </form>
   {% if patients %}
   <table>
     <thead><tr><th>Patient</th><th>Key fob</th><th>Age</th><th>Record</th></tr></thead>
@@ -19,8 +38,13 @@
       {% endfor %}
     </tbody>
   </table>
+  <p class="muted" aria-live="polite">{{ patients|length }} patient{{ '' if patients|length == 1 else 's' }} found.</p>
   {% else %}
-  <p>No patients have been added yet.</p>
+    {% if search %}
+    <p>No patients match “{{ search }}”. Try another name or key fob.</p>
+    {% else %}
+    <p>No patients have been added yet.</p>
+    {% endif %}
   {% endif %}
 </div>
 {% endblock %}

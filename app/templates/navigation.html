@@ -1,6 +1,6 @@
-<nav style="background: #203d4b; padding: 14px 20px; font-family: Arial, sans-serif;">
-  <a href="{{ url_for('pages.home') }}" style="color: white; text-decoration: none; font-weight: bold; margin-right: 20px;">Exercise Care Records</a>
-  <a href="{{ url_for('pages.patients') }}" style="color: #e4f2f3; text-decoration: none; margin-right: 16px;">Patients</a>
-  <a href="{{ url_for('pages.add_patient') }}" style="color: #e4f2f3; text-decoration: none; margin-right: 16px;">Add patient</a>
-  <a href="{{ url_for('pages.scan') }}" style="color: #b7eee0; text-decoration: none; margin-right: 16px;">Key fob scanner</a>
+<nav class="navigation">
+  <a class="brand-link" href="{{ url_for('pages.home') }}">CCCare Records</a>
+  <a href="{{ url_for('pages.patients') }}">Patients</a>
+  <a href="{{ url_for('pages.add_patient') }}">Add patient</a>
+  <a class="scanner-link" href="{{ url_for('pages.scan') }}">Key fob scanner</a>
 </nav>

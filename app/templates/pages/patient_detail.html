@@ -23,7 +23,7 @@
     <h2>Exercise prescription</h2>
     {% if patient.prescribed_exercises %}
       {% for e in patient.prescribed_exercises %}
-      <article style="border-top: 1px solid #dce5e8; padding: 10px 0;">
+      <article class="record-entry">
         <h3>{{ e.name }} <span class="muted">({{ e.category or 'Other' }})</span></h3>
         <p>
           {% if e.duration_minutes %}<strong>{{ e.duration_minutes }} min</strong>{% endif %}
@@ -47,7 +47,7 @@
     <p><a class="button" href="{{ url_for('pages.add_session', patient_id=patient.id) }}">Log a session</a></p>
     {% if patient.sessions %}
       {% for s in patient.sessions %}
-      <article style="border-top: 1px solid #dce5e8; padding: 12px 0;">
+      <article class="record-entry spaced">
         <h3>{{ s.date.strftime('%b %d, %Y at %I:%M %p') }}</h3>
         <p><strong>Warm-up:</strong> {{ s.warmup or 'Not recorded' }}</p>
         <p><strong>Cardio:</strong> {{ s.cardio or 'Not recorded' }}</p>
@@ -65,7 +65,7 @@
     <p><a class="button" href="{{ url_for('pages.add_appointment', patient_id=patient.id) }}">Add appointment</a></p>
     {% if patient.appointments %}
       {% for a in patient.appointments %}
-      <article style="border-top: 1px solid #dce5e8; padding: 12px 0;">
+      <article class="record-entry spaced">
         <h3>{{ a.appointment_date.strftime('%b %d, %Y at %I:%M %p') }}</h3>
         <p>{{ a.notes }}</p>
       </article>

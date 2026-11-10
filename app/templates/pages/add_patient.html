@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Add Patient{% endblock %}
 {% block content %}
-<div style="font-family: sans-serif; padding: 20px; max-width: 600px;">
+<div class="form-page narrow">
     <h1>Add New Patient</h1>
     <form method="POST">
         {{ form.hidden_tag() }}
-        <div style="margin-bottom: 15px;">
+        <div class="form-field">
             <p>{{ form.key_fob_id.label }}<br>{{ form.key_fob_id(size=20) }}</p>
-            {% for error in form.key_fob_id.errors %}<span style="color: red;">{{ error }}</span>{% endfor %}
+            {% for error in form.key_fob_id.errors %}<span class="errors">{{ error }}</span>{% endfor %}
         </div>
-        <div style="display: flex; gap: 10px;">
+        <div class="form-row">
             <p>{{ form.first_name.label }}<br>{{ form.first_name() }}</p>
             <p>{{ form.last_name.label }}<br>{{ form.last_name() }}</p>
         </div>
@@ -18,7 +18,7 @@
         <p>{{ form.initial_assessment.label }}<br>{{ form.initial_assessment(cols=50, rows=3) }}</p>
         <p>{{ form.health_details.label }}<br>{{ form.health_details(cols=50, rows=3) }}</p>
         <p>{{ form.notes.label }}<br>{{ form.notes(cols=50, rows=3) }}</p>
-        <button type="submit" style="padding: 10px 20px; background: #27ae60; color: white; border: none; cursor: pointer;">Save Patient</button>
+        <button class="button" type="submit">Save Patient</button>
     </form>
 </div>
 {% endblock %}

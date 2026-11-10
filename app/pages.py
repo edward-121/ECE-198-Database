@@ -15,8 +15,33 @@ def home():
 
 @pages.route("/patients")
 def patients():
-    all_patients = Patient.query.order_by(Patient.last_name, Patient.first_name).all()
-    return render_template("pages/patients.html", patients=all_patients)
+    search = request.args.get("q", "").strip()
+    sort_by = request.args.get("sort", "last_name")
+    if sort_by not in {"first_name", "last_name"}:
+        sort_by = "last_name"
+
+    query = Patient.query
+    if search:
+        escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_search}%"
+        query = query.filter(
+            db.or_(
+                Patient.first_name.ilike(pattern, escape="\\"),
+                Patient.last_name.ilike(pattern, escape="\\"),
+                (Patient.first_name + " " + Patient.last_name).ilike(pattern, escape="\\"),
+                Patient.key_fob_id.ilike(pattern, escape="\\"),
+            )
+        )
+
+    sort_column = getattr(Patient, sort_by)
+    secondary_column = Patient.last_name if sort_by == "first_name" else Patient.first_name
+    all_patients = query.order_by(sort_column, secondary_column).all()
+    return render_template(
+        "pages/patients.html",
+        patients=all_patients,
+        search=search,
+        sort_by=sort_by,
+    )
 
 @pages.route("/patient/<int:patient_id>")
 def patient_detail(patient_id):

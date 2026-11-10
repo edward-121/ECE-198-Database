@@ -3,27 +3,46 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Exercise Care Records{% endblock %}</title>
+  <title>{% block title %}CCCare Records{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/design-tokens.css') }}">
   <style>
-    :root { color-scheme: light; font-family: Arial, sans-serif; color: #23313d; background: #f4f7f8; }
+    html { font-family: var(--font-family-sans); font-size: var(--font-size-body); line-height: var(--line-height-body); color: var(--color-text); background: var(--color-background); }
     * { box-sizing: border-box; }
     body { margin: 0; }
     main { max-width: 1120px; margin: 24px auto; padding: 0 20px; }
-    h1, h2, h3 { color: #203d4b; }
-    a { color: #086c72; }
-    .card { background: white; border: 1px solid #dce5e8; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    h1, h2, h3 { color: var(--color-brand); line-height: var(--line-height-heading); }
+    h1 { font-size: var(--font-size-h1); }
+    h2 { font-size: var(--font-size-h2); }
+    h3 { font-size: var(--font-size-h3); }
+    a { color: var(--color-brand-link); }
+    .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 18px; margin: 16px 0; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-    .muted { color: #5d6b73; }
-    .button { display: inline-block; padding: 9px 13px; border-radius: 5px; background: #086c72; color: white; text-decoration: none; border: 0; cursor: pointer; }
-    .button.secondary { background: #e7f0f1; color: #174e53; }
-    table { border-collapse: collapse; width: 100%; background: white; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #dce5e8; vertical-align: top; }
-    th { background: #edf3f4; }
-    label { font-weight: bold; }
-    input, select, textarea { max-width: 100%; padding: 8px; border: 1px solid #b9c9ce; border-radius: 4px; }
-    .flash { padding: 10px 14px; border-radius: 5px; background: #e3f4eb; margin: 12px 0; }
-    .errors { color: #a32626; }
-    @media (max-width: 600px) { main { padding: 0 12px; } table { font-size: .9rem; } }
+    .muted { color: var(--color-text-muted); }
+    .button { display: inline-block; padding: 9px 13px; border-radius: 5px; background: var(--color-action); color: var(--color-action-text); text-decoration: none; border: 0; cursor: pointer; font: inherit; }
+    .button.secondary { background: var(--color-action-secondary); color: var(--color-success-text); }
+    table { border-collapse: collapse; width: 100%; background: var(--color-surface); }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    th { background: var(--color-surface-subtle); }
+    label { font-weight: var(--font-weight-bold); }
+    input, select, textarea { max-width: 100%; padding: 8px; border: 1px solid var(--color-border-input); border-radius: 4px; font: inherit; }
+    .flash { padding: 10px 14px; border-radius: 5px; background: var(--color-success); margin: 12px 0; }
+    .errors { color: var(--color-error); }
+    .navigation { background: var(--color-brand); padding: 14px 20px; }
+    .navigation a { color: var(--color-nav-link); text-decoration: none; margin-right: 16px; }
+    .navigation .brand-link { color: var(--color-surface); font-weight: var(--font-weight-bold); margin-right: 20px; }
+    .navigation .scanner-link { color: var(--color-nav-accent); }
+    .form-page { padding: 20px; }
+    .form-page.narrow { max-width: 640px; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .form-field { margin-bottom: 15px; }
+    .record-entry { border-top: 1px solid var(--color-border); padding: 10px 0; }
+    .record-entry.spaced { padding: 12px 0; }
+    .scan-result { border: 2px solid var(--color-success-border); padding: 20px; background: var(--color-success); margin-top: 20px; }
+    .lcd-preview { background: var(--color-terminal-background); color: var(--color-terminal-text); padding: 15px; display: inline-block; font-family: var(--font-family-mono); }
+    .error-message { color: var(--color-error); }
+    .patients-controls { align-items: end; margin-bottom: 18px; }
+    .patient-search { width: 100%; }
+    @media (max-width: 600px) { main { padding: 0 12px; } table { font-size: var(--font-size-small); } }
     {% block styles %}{% endblock %}
   </style>
 </head>
