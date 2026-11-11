@@ -7,16 +7,16 @@ from wtforms.validators import DataRequired, Length, Regexp, Optional
 
 FOB_ID_VALIDATORS = [
     DataRequired(),
-    Length(min=4, max=14, message="Key Fob ID must be 4 or 14 hexadecimal characters."),
+    Length(min=4, max=14, message="Key Fob ID must be 14 hexadecimal characters."),
     Regexp(
         r'^(?:[0-9a-fA-F]{4}|[0-9a-fA-F]{14})$',
-        message="Enter a 4-character legacy ID or a 14-character RFID UID.",
+        message="Enter a 14-character RFID UID.",
     ),
 ]
 
 
 class PatientForm(FlaskForm):
-    key_fob_id = StringField("Key Fob Hex ID (4 or 14 digits)", validators=FOB_ID_VALIDATORS)
+    key_fob_id = StringField("Key Fob Hex ID (14 digits)", validators=FOB_ID_VALIDATORS)
     first_name = StringField("First Name", validators=[DataRequired()])
     last_name = StringField("Last Name", validators=[DataRequired()])
     age = IntegerField("Age", validators=[Optional()])
@@ -87,12 +87,12 @@ class AppointmentForm(FlaskForm):
 
 
 class FobScanForm(FlaskForm):
-    key_fob_id = StringField("Key Fob ID (4 or 14 hex characters)", validators=FOB_ID_VALIDATORS)
+    key_fob_id = StringField("Key Fob ID (14 hex characters)", validators=FOB_ID_VALIDATORS)
     submit = SubmitField("Scan Fob")
 
 
 class FobAssignmentForm(FlaskForm):
-    key_fob_id = StringField("Key Fob Hex ID (4 or 14 digits)", validators=FOB_ID_VALIDATORS)
+    key_fob_id = StringField("Key Fob Hex ID (14 digits)", validators=FOB_ID_VALIDATORS)
     submit = SubmitField("Save Fob ID")
 
 
