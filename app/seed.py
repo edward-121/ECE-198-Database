@@ -1,14 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
 from .extensions import db
-from .models import Appointment, Patient, PrescribedExercise, SessionHistory
+from .models import Appointment, Patient, PrescribedExercise, SeedMarker, SessionHistory
 
 
 def seed_database():
-    """Create four sample patients with linked exercise plans and histories."""
-    if Patient.query.first():
-        return
-
+    """Create sample patients and ensure the RFID test patients exist."""
     now = datetime.now(timezone.utc)
     sample_data = [
         {
@@ -65,48 +62,106 @@ def seed_database():
         },
     ]
 
-    for index, data in enumerate(sample_data):
-        patient = Patient(
-            key_fob_id=data["fob"],
-            first_name=data["first"],
-            last_name=data["last"],
-            age=data["age"],
-            gender=data["gender"],
-            initial_assessment=data["assessment"],
-            health_details=data["health"],
-            notes=data["notes"],
-        )
-        db.session.add(patient)
-        db.session.flush()
+    if not Patient.query.first():
+        for index, data in enumerate(sample_data):
+            patient = Patient(
+                key_fob_id=data["fob"],
+                first_name=data["first"],
+                last_name=data["last"],
+                age=data["age"],
+                gender=data["gender"],
+                initial_assessment=data["assessment"],
+                health_details=data["health"],
+                notes=data["notes"],
+            )
+            db.session.add(patient)
+            db.session.flush()
 
-        for exercise in data["exercises"]:
-            name, category, duration, intensity, sets, reps, frequency, instructions = exercise
-            db.session.add(PrescribedExercise(
+            for exercise in data["exercises"]:
+                name, category, duration, intensity, sets, reps, frequency, instructions = exercise
+                db.session.add(PrescribedExercise(
+                    patient_id=patient.id,
+                    name=name,
+                    category=category,
+                    duration_minutes=duration,
+                    intensity=intensity,
+                    sets=sets,
+                    reps=reps,
+                    frequency=frequency,
+                    instructions=instructions,
+                ))
+
+            warmup, cardio, cooldown, notes = data["session"]
+            db.session.add(SessionHistory(
                 patient_id=patient.id,
-                name=name,
-                category=category,
-                duration_minutes=duration,
-                intensity=intensity,
-                sets=sets,
-                reps=reps,
-                frequency=frequency,
-                instructions=instructions,
+                date=now - timedelta(days=7 + index),
+                warmup=warmup,
+                cardio=cardio,
+                cooldown=cooldown,
+                notes=notes,
+            ))
+            db.session.add(Appointment(
+                patient_id=patient.id,
+                appointment_date=now + timedelta(days=7 + index * 2),
+                notes=data["appointment"],
             ))
 
-        warmup, cardio, cooldown, notes = data["session"]
-        db.session.add(SessionHistory(
-            patient_id=patient.id,
-            date=now - timedelta(days=7 + index),
-            warmup=warmup,
-            cardio=cardio,
-            cooldown=cooldown,
-            notes=notes,
-        ))
-        db.session.add(Appointment(
-            patient_id=patient.id,
-            appointment_date=now + timedelta(days=7 + index * 2),
-            notes=data["appointment"],
-        ))
+    rfid_test_patients = [
+        {
+            "fob": "040EE5429E6180", "first": "Ethan", "last": "Test",
+            "exercises": ["Bicep Curls", "Hopscotch", "1 hour walk"],
+        },
+        {
+            "fob": "045C88459E6181", "first": "Mohammed", "last": "Test",
+            "exercises": ["2 minute sprint", "Jumps", "Leg curls"],
+        },
+        {
+            "fob": "045FF518CD2A81", "first": "Edward", "last": "Test",
+            "exercises": ["Bench press", "Push ups", "Pullups"],
+        },
+        {
+            "fob": "04919D20CA2A81", "first": "Jonah", "last": "Test",
+            "exercises": ["Dips", "Tricep extensions", "Diamond pushups"],
+        },
+        {
+            "fob": "044CB8499E6180", "first": "Daniel", "last": "Test",
+            "exercises": ["Jumping Jacks", "Squats", "One mile"],
+        },
+    ]
+
+    seed_marker_key = "rfid_test_patients_v1"
+    if db.session.get(SeedMarker, seed_marker_key) is None:
+        seed_marker_key = "rfid_test_patients_v1"
+        if db.session.get(SeedMarker, seed_marker_key) is None:
+            for data in rfid_test_patients:
+                patient = Patient.query.filter(
+                    db.func.upper(Patient.key_fob_id) == data["fob"]
+                ).first()
+                if patient:
+                    continue
+
+                patient = Patient(
+                    key_fob_id=data["fob"],
+                    first_name=data["first"],
+                    last_name=data["last"],
+                    notes="Test patient for Arduino RFID reader.",
+                )
+                db.session.add(patient)
+                db.session.flush()
+
+                for name in data["exercises"]:
+                    db.session.add(PrescribedExercise(
+                        patient_id=patient.id,
+                        name=name,
+                        category="Other",
+                        duration_minutes=None,
+                        intensity=None,
+                        sets=0,
+                        reps=0,
+                        frequency="Test prescription",
+                        instructions="Test exercise for Arduino RFID reader.",
+                    ))
+            db.session.add(SeedMarker(key=seed_marker_key))
+        db.session.add(SeedMarker(key=seed_marker_key))
 
     db.session.commit()
-    print("Database seeded with 4 sample patient records.")

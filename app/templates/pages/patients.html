@@ -26,7 +26,7 @@
   </form>
   {% if patients %}
   <table>
-    <thead><tr><th>Patient</th><th>Key fob</th><th>Age</th><th>Record</th></tr></thead>
+    <thead><tr><th>Patient</th><th>Key fob</th><th>Age</th><th>Record</th><th>Actions</th></tr></thead>
     <tbody>
       {% for p in patients %}
       <tr>
@@ -34,6 +34,13 @@
         <td><code>{{ p.key_fob_id }}</code></td>
         <td>{{ p.age if p.age is not none else 'Not provided' }}</td>
         <td><a href="{{ url_for('pages.patient_detail', patient_id=p.id) }}">Open complete record</a></td>
+        <td>
+          <a href="{{ url_for('pages.edit_patient', patient_id=p.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('pages.delete_patient', patient_id=p.id) }}" onsubmit="return confirm('Permanently delete this patient and all linked records?');">
+            {{ delete_form.hidden_tag() }}
+            <button type="submit">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

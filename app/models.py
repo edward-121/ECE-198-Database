@@ -5,7 +5,7 @@ class Patient(db.Model):
     __tablename__ = "patient_list"
 
     id = db.Column(db.Integer, primary_key=True)
-    key_fob_id = db.Column(db.String(4), unique=True, nullable=False, index=True)
+    key_fob_id = db.Column(db.String(14), unique=True, nullable=False, index=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=True)
@@ -72,6 +72,12 @@ class Patient(db.Model):
             "lcd_16x2": [line1_16, line2_16],
             "lcd_20x4": [line1_20, line2_20, line3_20, line4_20]
         }
+
+
+class SeedMarker(db.Model):
+    __tablename__ = "seed_marker"
+
+    key = db.Column(db.String(100), primary_key=True)
 
 
 class PrescribedExercise(db.Model):

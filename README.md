@@ -13,6 +13,15 @@ flask --app app run --port 8000 --debug
 
 Exercise prescriptions support either a duration (for example, minutes of cardio) or sets and repetitions, plus category, intensity/target, frequency, and instructions. Session history records warm-up, cardio, cool-down, and notes.
 
+## Arduino RFID reader
+
+1. Open a patient record, choose **Change fob**, and enter that patient's 14-character RFID UID (the UID is printed by `Hardware.ino` in the Arduino serial monitor if needed).
+2. Upload `Hardware.ino` and connect the Arduino to the computer over USB.
+3. Run the Flask app over `localhost` and open its Scan page in a Web Serial-capable Chromium browser.
+4. Choose **Connect Arduino reader**, select the Arduino's serial port, and scan a fob. The browser looks up the UID in SQLite, shows the patient, then sends the patient's first three prescribed exercises back to the Arduino LCD.
+
+The browser must remain connected to the Scan page while scanning. Close the Arduino serial monitor before connecting the browser to the same port. The Arduino uses 115200 baud and waits up to 15 seconds for the database response.
+
 ## Data model
 
 - A patient has many exercise prescriptions, session-history entries, and appointments.
