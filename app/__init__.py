@@ -1,3 +1,5 @@
+import secrets
+import click
 from flask import Flask
 from sqlalchemy import inspect, text
 from .extensions import db
@@ -29,7 +31,46 @@ def create_app():
                 db.session.execute(text(
                     f"ALTER TABLE prescribed_exercise ADD COLUMN {column_name} {column_type}"
                 ))
+        patient_columns = {
+            column["name"]
+            for column in inspect(db.engine).get_columns("patient_list")
+        }
+        if "token" not in patient_columns:
+            db.session.execute(text("ALTER TABLE patient_list ADD COLUMN token VARCHAR(64)"))
+        for patient_id, token in db.session.execute(
+            text("SELECT id, token FROM patient_list WHERE token IS NULL OR token = ''")
+        ):
+            db.session.execute(
+                text("UPDATE patient_list SET token = :token WHERE id = :patient_id"),
+                {"token": secrets.token_urlsafe(32), "patient_id": patient_id},
+            )
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_patient_list_token ON patient_list (token)"
+        ))
         db.session.commit()
         seed_database()
+
+    @app.cli.command("workout-test-url")
+    def workout_test_url():
+        """Print the log URL for a seeded test patient with a countable exercise."""
+        from .models import Patient, PrescribedExercise
+
+        patient = (
+            Patient.query.filter_by(key_fob_id="044CB8499E6180")
+            .join(PrescribedExercise)
+            .filter(
+                db.or_(
+                    PrescribedExercise.name.ilike("%squat%"),
+                    db.and_(
+                        PrescribedExercise.name.ilike("%bicep%"),
+                        PrescribedExercise.name.ilike("%curl%"),
+                    ),
+                )
+            )
+            .first()
+        )
+        if patient is None:
+            raise click.ClickException("No patient with a Squat or Bicep Curl exercise was found.")
+        click.echo(f"http://localhost:8000/log?token={patient.token}")
 
     return app

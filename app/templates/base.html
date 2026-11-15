@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <title>{% block title %}CCCare Records{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/design-tokens.css') }}">
   <style>
@@ -38,16 +39,16 @@
     .record-entry { border-top: 1px solid var(--color-border); padding: 10px 0; }
     .record-entry.spaced { padding: 12px 0; }
     .scan-result { border: 2px solid var(--color-success-border); padding: 20px; background: var(--color-success); margin-top: 20px; }
-    .lcd-preview { background: var(--color-terminal-background); color: var(--color-terminal-text); padding: 15px; display: inline-block; font-family: var(--font-family-mono); }
     .error-message { color: var(--color-error); }
     .patients-controls { align-items: end; margin-bottom: 18px; }
     .patient-search { width: 100%; }
+    .workout-link { margin: 0 0 18px; }
     @media (max-width: 600px) { main { padding: 0 12px; } table { font-size: var(--font-size-small); } }
     {% block styles %}{% endblock %}
   </style>
 </head>
 <body>
-  {% include "navigation.html" %}
+  {% block navigation %}{% include "navigation.html" %}{% endblock %}
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}

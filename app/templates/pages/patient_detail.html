@@ -10,6 +10,9 @@
   &middot; Age {{ patient.age if patient.age is not none else 'not provided' }}
   &middot; {{ patient.gender or 'Gender not provided' }}
 </p>
+<p class="workout-link">
+  <a class="button" href="{{ workout_url }}">Patient workout link</a>
+</p>
 <form method="post" action="{{ url_for('pages.delete_patient', patient_id=patient.id) }}" onsubmit="return confirm('Permanently delete this patient and all linked records?');">
   {{ delete_form.hidden_tag() }}
   <button class="button" type="submit">Delete patient and linked records</button>
@@ -44,6 +47,22 @@
       <p>No exercises prescribed yet.</p>
     {% endif %}
     <a class="button" href="{{ url_for('pages.add_exercise', patient_id=patient.id) }}">Add exercise prescription</a>
+  </div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h2>Workout log <span class="muted">({{ patient.workout_logs|length }})</span></h2>
+    {% if patient.workout_logs %}
+      {% for entry in patient.workout_logs %}
+      <article class="record-entry">
+        <h3>{{ entry.exercise_name }} — {{ entry.reps_completed }} reps</h3>
+        <p>{{ entry.timestamp.strftime('%b %d, %Y at %I:%M %p') }} UTC · {{ entry.tracking_mode.replace('_', ' ') }}</p>
+      </article>
+      {% endfor %}
+    {% else %}
+      <p>No workout sets logged yet.</p>
+    {% endif %}
   </div>
 </section>
 
