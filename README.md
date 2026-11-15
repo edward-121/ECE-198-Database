@@ -9,9 +9,10 @@ Shared UI color and typography tokens are defined in `app/static/css/design-toke
 ```powershell
 pip install -r requirements.txt
 flask --app app run --host 0.0.0.0 --port 8000 --debug
+ngrok http 8000 --url https://appliance-outdoors-surfacing.ngrok-free.dev --traffic-policy-file tp.yml
 ```
 
-Open `http://localhost:8000` on the computer. To test from a phone on the same Wi-Fi or hotspot, open `http://<computer-ip>:8000` on the phone, where `<computer-ip>` is the computer's IPv4 address from `ipconfig`. Keep the Flask process running.
+Open `https://appliance-outdoors-surfacing.ngrok-free.dev/` on the computer and login.
 
 Exercise prescriptions support either a duration (for example, minutes of cardio) or sets and repetitions, plus category, intensity/target, frequency, and instructions. Session history records warm-up, cardio, cool-down, and notes.
 
@@ -33,8 +34,6 @@ To print a URL for a seeded patient who has a Squat or Bicep Curl exercise:
 ```powershell
 flask --app app workout-test-url
 ```
-
-Start the app with `flask --app app run --host 0.0.0.0 --port 8000`, then open the printed URL on the computer. For phone access on the same Wi-Fi or hotspot, use `http://<computer-ip>:8000/log?token=...` with the computer's IPv4 address. The patient can log repetitions manually or enable the camera counter for Squats and Bicep Curls. Camera counting requires HTTPS or localhost and explicit camera permission. MediaPipe's model/runtime assets are loaded by the browser from their public CDNs when camera counting is enabled; pose estimation and video frames remain in the browser and are never sent to this server. Turning the camera off or leaving the page stops the media tracks.
 
 For squat counting, keep the full body in view with good lighting; a side view helps the hip, knee, and ankle landmarks track. Squats switch to the down stage below a 120° knee angle and count a rep when the knee straightens above 140°. For curls, select the front or rear camera and face sideways to it so the shoulder, elbow, and wrist are visible. Curl angles use MediaPipe's 3D world landmarks when available and count the bend below 75° and extension above 135°. Clothing that hides the joints or hangs loosely can reduce pose visibility.
 
