@@ -12,36 +12,45 @@
     </form>
 
     {% if scanned_patient %}
-        <div class="scan-result">
+        <section class="scan-result">
             <h2>Scanned: {{ scanned_patient.first_name }} {{ scanned_patient.last_name }}</h2>
-            <h3>LCD Simulation</h3>
-            <pre class="lcd-preview">
-LCD 16x2:
-|{{ lcd_data.lcd_16x2[0] }}|
-|{{ lcd_data.lcd_16x2[1] }}|
-
-LCD 20x4:
-|{{ lcd_data.lcd_20x4[0] }}|
-|{{ lcd_data.lcd_20x4[1] }}|
-|{{ lcd_data.lcd_20x4[2] }}|
-|{{ lcd_data.lcd_20x4[3] }}|
-            </pre>
-        </div>
+            {% if scanned_patient.prescribed_exercises %}
+                <ol class="exercise-scan-list">
+                    {% for exercise in scanned_patient.prescribed_exercises %}
+                        <li><strong>Exercise {{ loop.index }}:</strong> {{ exercise.name }}</li>
+                    {% endfor %}
+                </ol>
+            {% else %}
+                <p><strong>Exercise 1:</strong> No exercises prescribed.</p>
+            {% endif %}
+        </section>
     {% elif form.key_fob_id.data %}
-        <p class="error-message">Fob not found.</p>
+        <section class="scan-result">
+            <p class="error-message">Fob not found.</p>
+            <a class="button" href="{{ url_for('pages.add_patient', key_fob_id=form.key_fob_id.data) }}">Register this fob</a>
+        </section>
     {% endif %}
-    <div id="reader-result" class="scan-result" hidden>
+    <section id="reader-result" class="scan-result" aria-live="polite" hidden>
         <h2 id="reader-patient"></h2>
-        <p id="reader-fob"></p>
-        <pre id="reader-lcd" class="lcd-preview"></pre>
-    </div>
+        <ol id="reader-exercises" class="exercise-scan-list"></ol>
+    </section>
+    <section id="unknown-fob-result" class="scan-result" hidden>
+        <p id="unknown-fob-message" class="error-message"></p>
+        <a id="register-unknown-fob" class="button">Register this fob</a>
+    </section>
 </div>
 <script>
 (() => {
     const connectButton = document.getElementById("connect-reader");
     const status = document.getElementById("reader-status");
     const result = document.getElementById("reader-result");
+    const unknownResult = document.getElementById("unknown-fob-result");
+    const unknownMessage = document.getElementById("unknown-fob-message");
+    const registerUnknownFob = document.getElementById("register-unknown-fob");
+    const patientHeading = document.getElementById("reader-patient");
+    const exerciseList = document.getElementById("reader-exercises");
     const encoder = new TextEncoder();
+    let activePatient = null;
 
     if (!("serial" in navigator)) {
         status.textContent = "Web Serial is unavailable. Use a supported Chromium browser over localhost or HTTPS.";
@@ -61,21 +70,47 @@ LCD 20x4:
     }
 
     function showPatient(data) {
-        document.getElementById("reader-patient").textContent = `Scanned: ${data.patient_name}`;
-        document.getElementById("reader-fob").textContent = `Fob UID: ${data.key_fob_id}`;
-        document.getElementById("reader-lcd").textContent =
-            `LCD 16x2:\n|${data.lcd_16x2[0]}|\n|${data.lcd_16x2[1]}|\n\n` +
-            `LCD 20x4:\n|${data.lcd_20x4.join("|\n|")}|\n`;
+        patientHeading.textContent = `Scanned: ${data.patient_name}`;
+        exerciseList.replaceChildren();
+        if (data.exercises.length) {
+            for (const [index, exercise] of data.exercises.entries()) {
+                const item = document.createElement("li");
+                const label = document.createElement("strong");
+                label.textContent = `Exercise ${index + 1}: `;
+                item.append(label, document.createTextNode(exercise.name));
+                exerciseList.append(item);
+            }
+        } else {
+            const item = document.createElement("li");
+            const label = document.createElement("strong");
+            label.textContent = "Exercise 1: ";
+            item.append(label, document.createTextNode("No exercises prescribed."));
+            exerciseList.append(item);
+        }
         result.hidden = false;
     }
 
-    async function handleUid(uid, writer) {
-        if (!/^[0-9a-fA-F]{14}$/.test(uid)) {
-            status.textContent = `Ignoring invalid reader data: ${uid}`;
+    async function handleExerciseRequest(line, writer) {
+        const match = /^GET\|(\d+)$/.exec(line);
+        if (!match) return false;
+        const index = Number(match[1]);
+        const exercise = activePatient?.exercises[index];
+        if (!Number.isSafeInteger(index) || !exercise) {
+            await sendToReader(writer, "E|Exercise not found");
+            return true;
+        }
+        await sendToReader(writer, `X|${serialField(exercise.name, 32)}`);
+        return true;
+    }
+
+    async function handleSerialLine(line, writer) {
+        if (await handleExerciseRequest(line, writer)) return;
+        if (!/^[0-9a-fA-F]{14}$/.test(line)) {
+            status.textContent = `Ignoring invalid reader data: ${line}`;
             return;
         }
 
-        const normalizedUid = uid.toUpperCase();
+        const normalizedUid = line.toUpperCase();
         status.textContent = `Looking up fob ${normalizedUid}…`;
         try {
             const response = await fetch(`/api/scan/${encodeURIComponent(normalizedUid)}`);
@@ -83,21 +118,23 @@ LCD 20x4:
             if (!response.ok) {
                 await sendToReader(writer, "E|Unknown fob");
                 status.textContent = `No patient is registered for fob ${normalizedUid}.`;
+                activePatient = null;
                 result.hidden = true;
+                unknownMessage.textContent = `Fob ${normalizedUid} is not registered.`;
+                registerUnknownFob.href =
+                    `/patients/add?key_fob_id=${encodeURIComponent(normalizedUid)}`;
+                unknownResult.hidden = false;
                 return;
             }
 
-            const exerciseNames = data.exercises.slice(0, 3).map((exercise) =>
-                serialField(exercise.name, 32)
-            );
-            while (exerciseNames.length < 3) {
-                exerciseNames.push("No exercise");
-            }
-            const patientName = serialField(data.patient_name.split(" ")[0], 24);
-            await sendToReader(writer, ["P", patientName, ...exerciseNames].join("|"));
+            unknownResult.hidden = true;
+            activePatient = data;
+            const patientName = serialField(data.patient_name.split(" ")[0], 24) || "Patient";
+            await sendToReader(writer, `P|${patientName}|${data.exercises.length}`);
             showPatient(data);
             status.textContent = `Loaded ${data.patient_name} from the database.`;
         } catch (error) {
+            activePatient = null;
             await sendToReader(writer, "E|Database unavailable");
             status.textContent = `Database lookup failed: ${error.message}`;
         }
@@ -126,9 +163,9 @@ LCD 20x4:
                 const lines = pending.split(/\r?\n/);
                 pending = lines.pop();
                 for (const line of lines) {
-                    const uid = line.trim();
-                    if (uid) {
-                        await handleUid(uid, writer);
+                    const message = line.trim();
+                    if (message) {
+                        await handleSerialLine(message, writer);
                     }
                 }
             }

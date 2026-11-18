@@ -10,18 +10,15 @@
 Adafruit_PN532 nfc(PN532_SS);   // hardware SPI
 rgb_lcd lcd;
 
-const uint8_t EX_COUNT = 3;     // exercises per user
-
 char patientName[25];
-char exercises[EX_COUNT][33];
+uint16_t exerciseCount = 0;
 
 void showReady() {
   lcd.clear();
-  lcd.setRGB(0, 0, 255);        // blue = waiting
+  lcd.setRGB(0, 0, 255);
   lcd.print("Scan your card...");
 }
 
-// Prints the UID bytes as hex with leading zeros (lcd.print can't do uint64_t)
 void printUid(const uint8_t* bytes, uint8_t len) {
   for (uint8_t i = 0; i < len; i++) {
     if (bytes[i] < 0x10) lcd.print("0");
@@ -29,53 +26,103 @@ void printUid(const uint8_t* bytes, uint8_t len) {
   }
 }
 
-// Draws one exercise: name + position on top, exercise on the bottom
-void showExercise(uint8_t idx) {
+bool requestExercise(uint16_t index, char* exercise, size_t exerciseSize) {
+  Serial.print("GET|");
+  Serial.println(index);
+
+  uint32_t started = millis();
+  while (millis() - started < 6000) {
+    if (!Serial.available()) continue;
+
+    String response = Serial.readStringUntil('\n');
+    response.trim();
+    if (response.startsWith("X|")) {
+      response.substring(2).toCharArray(exercise, exerciseSize);
+      return true;
+    }
+    if (response.startsWith("E|")) {
+      return false;
+    }
+  }
+  return false;
+}
+
+void showExercise(uint16_t index) {
   char header[17];
-  snprintf(header, sizeof(header), "%.12s %u/%u", patientName, idx + 1, EX_COUNT);
+  char exercise[33];
+
+  snprintf(
+    header,
+    sizeof(header),
+    "%.8s %u/%u",
+    patientName,
+    (unsigned int)(index + 1),
+    (unsigned int)exerciseCount
+  );
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(header);
   lcd.setCursor(0, 1);
+  lcd.print("Loading...");
+
+  if (!requestExercise(index, exercise, sizeof(exercise))) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Exercise lookup");
+    lcd.setCursor(0, 1);
+    lcd.print("failed");
+    return;
+  }
+
+  lcd.setCursor(0, 1);
   uint8_t length = 0;
-  while (length < 16 && exercises[idx][length]) {
-    lcd.print(exercises[idx][length]);
+  while (length < 16 && exercise[length]) {
+    lcd.print(exercise[length]);
     length++;
   }
-  for (uint8_t i = length; i < 16; i++) {
+  while (length++ < 16) {
     lcd.print(" ");
   }
 }
 
-// Pot picks the exercise, button exits
 void browseExercises() {
-  lcd.setRGB(0, 255, 0);
+  if (exerciseCount == 0) {
+    lcd.clear();
+    lcd.setRGB(0, 255, 0);
+    lcd.print("No exercises");
+    delay(2000);
+    return;
+  }
 
+  lcd.setRGB(0, 255, 0);
   int raw = analogRead(POT_PIN);
-  uint8_t idx = constrain((long)raw * EX_COUNT / 1024, 0, EX_COUNT - 1);
-  showExercise(idx);
+  uint16_t index = ((uint32_t)raw * exerciseCount) / 1024UL;
+  if (index >= exerciseCount) index = exerciseCount - 1;
+  showExercise(index);
 
   while (true) {
-    // Button pressed (wired to GND, so LOW = pressed)
     if (digitalRead(BUTTON_PIN) == LOW) {
-      delay(30);                                   // debounce
+      delay(30);
       if (digitalRead(BUTTON_PIN) == LOW) {
-        while (digitalRead(BUTTON_PIN) == LOW);    // wait for release
+        while (digitalRead(BUTTON_PIN) == LOW);
         delay(30);
         return;
       }
     }
 
     raw = analogRead(POT_PIN);
-    uint8_t newIdx = constrain((long)raw * EX_COUNT / 1024, 0, EX_COUNT - 1);
+    uint16_t newIndex = ((uint32_t)raw * exerciseCount) / 1024UL;
+    if (newIndex >= exerciseCount) newIndex = exerciseCount - 1;
 
-    // Only switch if the pot has moved a little past the boundary (stops flicker)
-    if (newIdx != idx) {
-      long zoneStart = (long)newIdx * 1024 / EX_COUNT;
-      long zoneEnd   = (long)(newIdx + 1) * 1024 / EX_COUNT;
-      if (raw > zoneStart + 15 && raw < zoneEnd - 15) {
-        idx = newIdx;
-        showExercise(idx);
+    if (newIndex != index) {
+      long zoneStart = (long)newIndex * 1024L / exerciseCount;
+      long zoneEnd = (long)(newIndex + 1) * 1024L / exerciseCount;
+      long margin = 15;
+      long zoneWidth = zoneEnd - zoneStart;
+      if (zoneWidth / 3 < margin) margin = zoneWidth / 3;
+      if (raw >= zoneStart + margin && raw < zoneEnd - margin) {
+        index = newIndex;
+        showExercise(index);
       }
     }
     delay(20);
@@ -108,25 +155,24 @@ bool receivePatientData(const uint8_t* uidBytes, uint8_t uidLength) {
     }
     if (!response.startsWith("P|")) continue;
 
-    String fields[5];
-    int start = 0;
-    bool complete = true;
-    for (uint8_t i = 0; i < 5; i++) {
-      int separator = response.indexOf('|', start);
-      if (i == 4) separator = response.length();
-      if (separator < 0) {
-        complete = false;
+    int nameEnd = response.indexOf('|', 2);
+    if (nameEnd < 0) continue;
+
+    String countText = response.substring(nameEnd + 1);
+    if (countText.length() == 0) continue;
+    bool validCount = true;
+    for (uint8_t i = 0; i < countText.length(); i++) {
+      if (!isDigit(countText[i])) {
+        validCount = false;
         break;
       }
-      fields[i] = response.substring(start, separator);
-      start = separator + 1;
     }
-    if (!complete) continue;
+    if (!validCount) continue;
 
-    fields[1].toCharArray(patientName, sizeof(patientName));
-    for (uint8_t i = 0; i < EX_COUNT; i++) {
-      fields[i + 2].toCharArray(exercises[i], sizeof(exercises[i]));
-    }
+    unsigned long count = countText.toInt();
+    if (count > 65535UL) continue;
+    response.substring(2, nameEnd).toCharArray(patientName, sizeof(patientName));
+    exerciseCount = (uint16_t)count;
     return true;
   }
 
@@ -141,23 +187,22 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   Serial.begin(115200);
-  Serial.setTimeout(15000);
+  Serial.setTimeout(1000);
   lcd.begin(16, 2);
   nfc.begin();
 
-  lcd.setRGB(255, 165, 0);      // orange = connecting
+  lcd.setRGB(255, 165, 0);
   lcd.print("Looking for");
   lcd.setCursor(0, 1);
   lcd.print("PN532...");
 
-  // Keep checking until the reader responds
   uint32_t version = 0;
   while (!version) {
     version = nfc.getFirmwareVersion();
     if (!version) delay(1000);
   }
 
-  nfc.SAMConfig();              // configure to read cards
+  nfc.SAMConfig();
   showReady();
 }
 
@@ -165,11 +210,9 @@ void loop() {
   uint8_t uidBytes[7] = {0};
   uint8_t uidLength = 0;
 
-  // Waits up to 500 ms for a card
   bool found = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uidBytes, &uidLength, 500);
   if (!found) return;
 
-  // Only 7-byte cards are supported
   if (uidLength != 7) {
     lcd.clear();
     lcd.setRGB(255, 0, 0);
@@ -181,7 +224,6 @@ void loop() {
     return;
   }
 
-  // Send the complete UID to the scan page, which looks it up in SQLite.
   for (uint8_t i = 0; i < 7; i++) {
     if (uidBytes[i] < 0x10) Serial.print("0");
     Serial.print(uidBytes[i], HEX);

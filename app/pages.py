@@ -1,12 +1,19 @@
+from datetime import datetime, timezone
+import re
 from flask import Blueprint, render_template, redirect, url_for, jsonify, request, flash
 from .extensions import db
-from .models import Appointment, Patient, PrescribedExercise, SessionHistory
+from .models import Appointment, Patient, PrescribedExercise, SessionHistory, WorkoutLog
 from .forms import (
     AppointmentForm, DeletePatientForm, FobAssignmentForm, FobScanForm,
     PatientForm, PrescribedExerciseForm, SessionHistoryForm,
 )
 
 pages = Blueprint("pages", __name__)
+_PATIENT_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
+
+
+def _valid_patient_token(token):
+    return isinstance(token, str) and _PATIENT_TOKEN_PATTERN.fullmatch(token) is not None
 
 
 def _normalize_fob_id(fob_id):
@@ -61,6 +68,7 @@ def patient_detail(patient_id):
         "pages/patient_detail.html",
         patient=patient,
         delete_form=DeletePatientForm(),
+        workout_url=url_for("pages.workout_log_page", token=patient.token, _external=True),
     )
 
 
@@ -151,6 +159,10 @@ def add_patient():
         db.session.commit()
         flash(f"Patient {new_patient.first_name} added!", "success")
         return redirect(url_for("pages.patient_detail", patient_id=new_patient.id))
+    if request.method == "GET":
+        fob_code = _normalize_fob_id(request.args.get("key_fob_id", ""))
+        if fob_code:
+            form.key_fob_id.data = fob_code
     return render_template("pages/add_patient.html", form=form)
 
 @pages.route("/patient/<int:patient_id>/add_exercise", methods=["GET", "POST"])
@@ -216,7 +228,6 @@ def add_appointment(patient_id):
 def scan():
     form = FobScanForm()
     scanned_patient = None
-    lcd_data = None
     fob_input = _normalize_fob_id(request.args.get("fob", ""))
 
     if fob_input:
@@ -224,14 +235,12 @@ def scan():
         scanned_patient = Patient.query.filter(
             db.func.upper(Patient.key_fob_id) == fob_input
         ).first()
-        if scanned_patient:
-            lcd_data = scanned_patient.to_lcd_dict()
 
     if form.validate_on_submit():
         fob_code = form.key_fob_id.data.strip().upper()
         return redirect(url_for("pages.scan", fob=fob_code))
 
-    return render_template("pages/scan.html", form=form, scanned_patient=scanned_patient, lcd_data=lcd_data)
+    return render_template("pages/scan.html", form=form, scanned_patient=scanned_patient)
 
 @pages.route("/api/scan/<fob_id>", methods=["GET"])
 def api_scan_fob(fob_id):
@@ -243,6 +252,101 @@ def api_scan_fob(fob_id):
     ).first()
     if not patient:
         return jsonify({"status": "error", "message": "Not found"}), 404
-    res = patient.to_lcd_dict()
-    res["status"] = "success"
-    return jsonify(res), 200
+    return jsonify({
+        "patient_name": f"{patient.first_name} {patient.last_name}",
+        "exercises": [
+            {"name": exercise.name}
+            for exercise in patient.prescribed_exercises
+        ],
+    }), 200
+
+
+@pages.route("/log")
+def workout_log_page():
+    return render_template("pages/workout_log.html")
+
+
+@pages.route("/api/patient-lookup")
+def api_patient_lookup():
+    token = request.args.get("token", "")
+    if not _valid_patient_token(token):
+        return jsonify({"error": "A valid patient token is required."}), 400
+    patient = Patient.query.filter_by(token=token).first()
+    if patient is None:
+        return jsonify({"error": "Patient token not found."}), 404
+
+    return jsonify({
+        "participant_id": patient.id,
+        "name": f"{patient.first_name} {patient.last_name}",
+        "exercises": [
+            {
+                "id": exercise.id,
+                "name": exercise.name,
+                "category": exercise.category,
+                "sets": exercise.sets,
+                "reps": exercise.reps,
+                "frequency": exercise.frequency,
+                "instructions": exercise.instructions,
+                "duration_minutes": exercise.duration_minutes,
+            }
+            for exercise in patient.prescribed_exercises
+        ],
+    })
+
+
+@pages.route("/api/workout-logs", methods=["POST"])
+def api_create_workout_log():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "A JSON request body is required."}), 400
+
+    token = payload.get("token")
+    exercise_id = payload.get("exercise_id")
+    reps_completed = payload.get("reps_completed")
+    tracking_mode = payload.get("tracking_mode")
+    if not _valid_patient_token(token):
+        return jsonify({"error": "A valid patient token is required."}), 400
+    if isinstance(exercise_id, bool) or not isinstance(exercise_id, int) or exercise_id < 1:
+        return jsonify({"error": "A valid prescribed exercise is required."}), 400
+    if isinstance(reps_completed, bool) or not isinstance(reps_completed, int) or not 0 <= reps_completed <= 10000:
+        return jsonify({"error": "Repetitions must be an integer from 0 to 10000."}), 400
+    if not isinstance(tracking_mode, str) or tracking_mode not in {"camera_auto", "manual"}:
+        return jsonify({"error": "Tracking mode must be camera_auto or manual."}), 400
+
+    patient = Patient.query.filter_by(token=token).first()
+    if patient is None:
+        return jsonify({"error": "Patient token not found."}), 404
+    exercise = PrescribedExercise.query.filter_by(
+        id=exercise_id,
+        patient_id=patient.id,
+    ).first()
+    if exercise is None:
+        return jsonify({"error": "That exercise is not assigned to this patient."}), 400
+    if tracking_mode == "camera_auto" and not _supports_auto_count(exercise.name):
+        return jsonify({"error": "Camera counting is not supported for that exercise."}), 400
+
+    logged_at = datetime.now(timezone.utc)
+    log_entry = WorkoutLog(
+        participant_id=patient.id,
+        exercise_id=exercise.id,
+        exercise_name=exercise.name,
+        reps_completed=reps_completed,
+        tracking_mode=tracking_mode,
+        timestamp=logged_at,
+    )
+    db.session.add(log_entry)
+    db.session.commit()
+    return jsonify({
+        "id": log_entry.id,
+        "participant_id": log_entry.participant_id,
+        "exercise_name": log_entry.exercise_name,
+        "reps_completed": log_entry.reps_completed,
+        "tracking_mode": log_entry.tracking_mode,
+        "timestamp": logged_at.isoformat(),
+    }), 201
+
+
+def _supports_auto_count(exercise_name):
+    return "squat" in exercise_name.casefold() or (
+        "bicep" in exercise_name.casefold() and "curl" in exercise_name.casefold()
+    )

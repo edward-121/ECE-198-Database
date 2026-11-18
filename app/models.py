@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import secrets
 from .extensions import db
 
 class Patient(db.Model):
@@ -6,6 +7,7 @@ class Patient(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     key_fob_id = db.Column(db.String(14), unique=True, nullable=False, index=True)
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=True)
@@ -23,56 +25,6 @@ class Patient(db.Model):
 
     def __repr__(self):
         return f"<Patient {self.id}: {self.first_name} {self.last_name} (Fob: {self.key_fob_id})>"
-
-    def to_lcd_dict(self):
-        """Format prescribed exercise and patient info for 16x2 and 20x4 LCD screens."""
-        name_short = f"{self.first_name[0]}. {self.last_name}" if self.first_name and self.last_name else self.first_name
-        full_name = f"{self.first_name} {self.last_name}"
-
-        primary_ex = self.prescribed_exercises[0] if self.prescribed_exercises else None
-        if primary_ex:
-            if primary_ex.duration_minutes:
-                dose = f"{primary_ex.duration_minutes} min"
-            elif primary_ex.sets and primary_ex.reps:
-                dose = f"{primary_ex.sets}x{primary_ex.reps}"
-            else:
-                dose = ""
-            ex_str = f"{primary_ex.name} {dose}".strip()
-            instr_str = primary_ex.intensity or primary_ex.frequency or "See plan"
-        else:
-            ex_str = "No active exercise"
-            instr_str = "N/A"
-
-        prog_cat = self.programs[0].functional_category if self.programs else (primary_ex.category if primary_ex else "General")
-
-        line1_16 = f"FOB:{self.key_fob_id.upper()} {name_short}"[:16].ljust(16)
-        line2_16 = f"{ex_str}"[:16].ljust(16)
-
-        line1_20 = f"FOB:{self.key_fob_id.upper()} | {full_name}"[:20].ljust(20)
-        line2_20 = f"Ex: {ex_str}"[:20].ljust(20)
-        line3_20 = f"Inst: {instr_str}"[:20].ljust(20)
-        line4_20 = f"Prog: {prog_cat}"[:20].ljust(20)
-
-        return {
-            "patient_id": self.id,
-            "key_fob_id": self.key_fob_id.upper(),
-            "patient_name": full_name,
-            "exercises": [
-                {
-                    "name": e.name,
-                    "category": e.category,
-                    "duration_minutes": e.duration_minutes,
-                    "intensity": e.intensity,
-                    "sets": e.sets,
-                    "reps": e.reps,
-                    "frequency": e.frequency,
-                    "instructions": e.instructions
-                } for e in self.prescribed_exercises
-            ],
-            "lcd_16x2": [line1_16, line2_16],
-            "lcd_20x4": [line1_20, line2_20, line3_20, line4_20]
-        }
-
 
 class SeedMarker(db.Model):
     __tablename__ = "seed_marker"
@@ -132,3 +84,23 @@ class Appointment(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey("patient_list.id"), nullable=False)
     appointment_date = db.Column(db.DateTime, nullable=False)
     notes = db.Column(db.Text, nullable=True)
+
+
+class WorkoutLog(db.Model):
+    __tablename__ = "workout_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    participant_id = db.Column(db.Integer, db.ForeignKey("patient_list.id"), nullable=False, index=True)
+    exercise_id = db.Column(db.Integer, db.ForeignKey("prescribed_exercise.id"), nullable=False)
+    exercise_name = db.Column(db.String(100), nullable=False)
+    reps_completed = db.Column(db.Integer, nullable=False)
+    tracking_mode = db.Column(db.String(20), nullable=False)
+    timestamp = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    participant = db.relationship("Patient", backref=db.backref(
+        "workout_logs",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="WorkoutLog.timestamp.desc()",
+    ))
+    exercise = db.relationship("PrescribedExercise")
