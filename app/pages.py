@@ -9,6 +9,7 @@ from .forms import (
 )
 
 pages = Blueprint("pages", __name__)
+# secrets.token_urlsafe(32) always produces 43 URL-safe base64 characters
 _PATIENT_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
@@ -16,6 +17,7 @@ def _valid_patient_token(token):
     return isinstance(token, str) and _PATIENT_TOKEN_PATTERN.fullmatch(token) is not None
 
 
+# Returns the uppercased fob ID if it's valid (4 or 14 hex chars), otherwise None.
 def _normalize_fob_id(fob_id):
     clean_fob = fob_id.strip().upper()
     if len(clean_fob) not in {4, 14} or any(
@@ -39,6 +41,7 @@ def patients():
 
     query = Patient.query
     if search:
+        # Escape LIKE wildcards so a search for "%" or "_" matches literally
         escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped_search}%"
         query = query.filter(
@@ -78,6 +81,7 @@ def edit_patient(patient_id):
     form = PatientForm(obj=patient)
     if form.validate_on_submit():
         fob_code = form.key_fob_id.data.strip().upper()
+        # Make sure no *other* patient already has this fob
         existing = Patient.query.filter(
             db.func.upper(Patient.key_fob_id) == fob_code,
             Patient.id != patient.id,
@@ -108,6 +112,7 @@ def delete_patient(patient_id):
 
     patient = Patient.query.get_or_404(patient_id)
     patient_name = f"{patient.first_name} {patient.last_name}"
+    # Cascades remove the patient's exercises, sessions, appointments and workout logs
     db.session.delete(patient)
     db.session.commit()
     flash(f"Patient {patient_name} and their linked records were deleted.", "success")
@@ -159,6 +164,7 @@ def add_patient():
         db.session.commit()
         flash(f"Patient {new_patient.first_name} added!", "success")
         return redirect(url_for("pages.patient_detail", patient_id=new_patient.id))
+    # Pre-fill the fob field when coming from "Register this fob" on the scan page
     if request.method == "GET":
         fob_code = _normalize_fob_id(request.args.get("key_fob_id", ""))
         if fob_code:
@@ -224,6 +230,7 @@ def add_appointment(patient_id):
         return redirect(url_for("pages.patient_detail", patient_id=patient.id))
     return render_template("pages/add_appointment.html", form=form, patient=patient)
 
+# Manual fob lookup. A POST redirects to ?fob=... so the result page is bookmarkable/refreshable.
 @pages.route("/scan", methods=["GET", "POST"])
 def scan():
     form = FobScanForm()
@@ -242,6 +249,7 @@ def scan():
 
     return render_template("pages/scan.html", form=form, scanned_patient=scanned_patient)
 
+# Used by the scan page's Web Serial code when the Arduino reader sends a UID.
 @pages.route("/api/scan/<fob_id>", methods=["GET"])
 def api_scan_fob(fob_id):
     clean_fob = _normalize_fob_id(fob_id)
@@ -261,6 +269,8 @@ def api_scan_fob(fob_id):
     }), 200
 
 
+# Patient-facing workout page. It's a static shell; workout-log.js reads the
+# token from the URL and loads the plan via /api/patient-lookup.
 @pages.route("/log")
 def workout_log_page():
     return render_template("pages/workout_log.html")
@@ -306,6 +316,7 @@ def api_create_workout_log():
     tracking_mode = payload.get("tracking_mode")
     if not _valid_patient_token(token):
         return jsonify({"error": "A valid patient token is required."}), 400
+    # bool is a subclass of int in Python, so reject True/False explicitly
     if isinstance(exercise_id, bool) or not isinstance(exercise_id, int) or exercise_id < 1:
         return jsonify({"error": "A valid prescribed exercise is required."}), 400
     if isinstance(reps_completed, bool) or not isinstance(reps_completed, int) or not 0 <= reps_completed <= 10000:
@@ -316,6 +327,7 @@ def api_create_workout_log():
     patient = Patient.query.filter_by(token=token).first()
     if patient is None:
         return jsonify({"error": "Patient token not found."}), 404
+    # Only allow logging exercises that belong to this patient
     exercise = PrescribedExercise.query.filter_by(
         id=exercise_id,
         patient_id=patient.id,
@@ -346,6 +358,7 @@ def api_create_workout_log():
     }), 201
 
 
+# Server-side mirror of supportedExerciseType() in rep-counter.mjs
 def _supports_auto_count(exercise_name):
     return "squat" in exercise_name.casefold() or (
         "bicep" in exercise_name.casefold() and "curl" in exercise_name.casefold()

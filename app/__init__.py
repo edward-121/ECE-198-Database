@@ -18,6 +18,8 @@ def create_app():
     from . import models  
     with app.app_context():
         db.create_all()
+        # Lightweight migration: create_all() won't add columns to existing tables,
+        # so add any columns introduced after an older app.db was created.
         exercise_columns = {
             column["name"]
             for column in inspect(db.engine).get_columns("prescribed_exercise")
@@ -35,6 +37,8 @@ def create_app():
             column["name"]
             for column in inspect(db.engine).get_columns("patient_list")
         }
+        # Every patient needs a private token for their workout-log link.
+        # Add the column if missing, then backfill tokens for older rows.
         if "token" not in patient_columns:
             db.session.execute(text("ALTER TABLE patient_list ADD COLUMN token VARCHAR(64)"))
         for patient_id, token in db.session.execute(
@@ -48,8 +52,10 @@ def create_app():
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_patient_list_token ON patient_list (token)"
         ))
         db.session.commit()
+        # Insert demo/test patients (only does anything on a fresh DB).
         seed_database()
 
+    # Run with `flask workout-test-url` to get a ready-to-open workout log link.
     @app.cli.command("workout-test-url")
     def workout_test_url():
         """Print the log URL for a seeded test patient with a countable exercise."""

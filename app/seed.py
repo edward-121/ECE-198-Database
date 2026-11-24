@@ -7,6 +7,7 @@ from .models import Appointment, Patient, PrescribedExercise, SeedMarker, Sessio
 def seed_database():
     """Create sample patients and ensure the RFID test patients exist."""
     now = datetime.now(timezone.utc)
+    # Demo patients, only inserted into an empty database
     sample_data = [
         {
             "fob": "A1B2", "first": "Alice", "last": "Johnson", "age": 34,
@@ -75,7 +76,7 @@ def seed_database():
                 notes=data["notes"],
             )
             db.session.add(patient)
-            db.session.flush()
+            db.session.flush()  # assigns patient.id so child rows can reference it
 
             for exercise in data["exercises"]:
                 name, category, duration, intensity, sets, reps, frequency, instructions = exercise
@@ -106,6 +107,8 @@ def seed_database():
                 notes=data["appointment"],
             ))
 
+    # Patients tied to the team's physical test fobs, for testing the Arduino reader.
+    # Guarded by a SeedMarker so they're only added once (and not re-added if deleted).
     rfid_test_patients = [
         {
             "fob": "040EE5429E6180", "first": "Ethan", "last": "Test",
@@ -131,37 +134,34 @@ def seed_database():
 
     seed_marker_key = "rfid_test_patients_v1"
     if db.session.get(SeedMarker, seed_marker_key) is None:
-        seed_marker_key = "rfid_test_patients_v1"
-        if db.session.get(SeedMarker, seed_marker_key) is None:
-            for data in rfid_test_patients:
-                patient = Patient.query.filter(
-                    db.func.upper(Patient.key_fob_id) == data["fob"]
-                ).first()
-                if patient:
-                    continue
+        for data in rfid_test_patients:
+            patient = Patient.query.filter(
+                db.func.upper(Patient.key_fob_id) == data["fob"]
+            ).first()
+            if patient:
+                continue
 
-                patient = Patient(
-                    key_fob_id=data["fob"],
-                    first_name=data["first"],
-                    last_name=data["last"],
-                    notes="Test patient for Arduino RFID reader.",
-                )
-                db.session.add(patient)
-                db.session.flush()
+            patient = Patient(
+                key_fob_id=data["fob"],
+                first_name=data["first"],
+                last_name=data["last"],
+                notes="Test patient for Arduino RFID reader.",
+            )
+            db.session.add(patient)
+            db.session.flush()
 
-                for name in data["exercises"]:
-                    db.session.add(PrescribedExercise(
-                        patient_id=patient.id,
-                        name=name,
-                        category="Other",
-                        duration_minutes=None,
-                        intensity=None,
-                        sets=0,
-                        reps=0,
-                        frequency="Test prescription",
-                        instructions="Test exercise for Arduino RFID reader.",
-                    ))
-            db.session.add(SeedMarker(key=seed_marker_key))
+            for name in data["exercises"]:
+                db.session.add(PrescribedExercise(
+                    patient_id=patient.id,
+                    name=name,
+                    category="Other",
+                    duration_minutes=None,
+                    intensity=None,
+                    sets=0,
+                    reps=0,
+                    frequency="Test prescription",
+                    instructions="Test exercise for Arduino RFID reader.",
+                ))
         db.session.add(SeedMarker(key=seed_marker_key))
 
     db.session.commit()

@@ -6,7 +6,9 @@ class Patient(db.Model):
     __tablename__ = "patient_list"
 
     id = db.Column(db.Integer, primary_key=True)
+    # 14 hex chars = 7-byte RFID UID (4-char IDs are allowed for the old demo patients)
     key_fob_id = db.Column(db.String(14), unique=True, nullable=False, index=True)
+    # Random URL-safe secret used in the patient's /log?token=... link (no login needed)
     token = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
@@ -26,12 +28,15 @@ class Patient(db.Model):
     def __repr__(self):
         return f"<Patient {self.id}: {self.first_name} {self.last_name} (Fob: {self.key_fob_id})>"
 
+# Records which seed steps have already run so they don't re-insert data on every startup.
 class SeedMarker(db.Model):
     __tablename__ = "seed_marker"
 
     key = db.Column(db.String(100), primary_key=True)
 
 
+# An exercise a clinician prescribed to a patient. Either duration_minutes or
+# sets+reps is used (sets/reps are 0 for time-based exercises).
 class PrescribedExercise(db.Model):
     __tablename__ = "prescribed_exercise"
     id = db.Column(db.Integer, primary_key=True)
@@ -86,15 +91,17 @@ class Appointment(db.Model):
     notes = db.Column(db.Text, nullable=True)
 
 
+# One saved set from the patient-facing workout page.
 class WorkoutLog(db.Model):
     __tablename__ = "workout_log"
 
     id = db.Column(db.Integer, primary_key=True)
     participant_id = db.Column(db.Integer, db.ForeignKey("patient_list.id"), nullable=False, index=True)
     exercise_id = db.Column(db.Integer, db.ForeignKey("prescribed_exercise.id"), nullable=False)
+    # Copy of the name at log time, so history still reads correctly if the exercise is renamed
     exercise_name = db.Column(db.String(100), nullable=False)
     reps_completed = db.Column(db.Integer, nullable=False)
-    tracking_mode = db.Column(db.String(20), nullable=False)
+    tracking_mode = db.Column(db.String(20), nullable=False)  # "camera_auto" or "manual"
     timestamp = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     participant = db.relationship("Patient", backref=db.backref(
