@@ -5,6 +5,8 @@ from wtforms import StringField, IntegerField, TextAreaField, SelectField, Submi
 from wtforms.fields import DateTimeLocalField
 from wtforms.validators import DataRequired, Length, Regexp, Optional
 
+# Shared validators for any fob ID field. Accepts a 14-char RFID UID,
+# or a 4-char ID (used by the original demo patients).
 FOB_ID_VALIDATORS = [
     DataRequired(),
     Length(min=4, max=14, message="Key Fob ID must be 14 hexadecimal characters."),
@@ -43,6 +45,8 @@ class PrescribedExerciseForm(FlaskForm):
     instructions = TextAreaField("Instructions", validators=[Optional()])
     submit = SubmitField("Add Prescribed Exercise")
 
+    # Cross-field checks: an exercise must be time-based (duration) or
+    # rep-based (sets AND reps), and all numbers must be positive.
     def validate(self, extra_validators=None):
         valid = super().validate(extra_validators=extra_validators)
         if self.duration_minutes.data is None and not (self.sets.data and self.reps.data):
@@ -96,5 +100,6 @@ class FobAssignmentForm(FlaskForm):
     submit = SubmitField("Save Fob ID")
 
 
+# Empty form: exists only so the delete button gets a CSRF token.
 class DeletePatientForm(FlaskForm):
     pass

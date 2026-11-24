@@ -21,6 +21,7 @@ const elements = {
   saveStatus: document.getElementById("save-status"),
 };
 
+// Patient's private token from the link (/log?token=...)
 const token = new URLSearchParams(window.location.search).get("token") || "";
 let exercises = [];
 let selectedExercise = null;
@@ -29,8 +30,12 @@ let poseLandmarker = null;
 let counter = null;
 let animationFrame = null;
 let lastVideoTime = -1;
+// Bumped on every start/stop; async startCamera() checks it to bail out if the
+// camera was turned off (or restarted) while it was still loading.
 let cameraGeneration = 0;
 
+// Clamp and display the rep count. updateCounter=true syncs manual edits back
+// into the camera counter so it continues from the user's number.
 function setRepValue(value, updateCounter = false) {
   const parsed = Number.parseInt(value, 10);
   const repCount = Number.isFinite(parsed) ? Math.min(10000, Math.max(0, parsed)) : 0;
@@ -62,6 +67,7 @@ function showExerciseDetails() {
   }
 }
 
+// Build the plan cards and the exercise dropdown from the loaded exercises.
 function renderPlan() {
   elements.plan.replaceChildren();
   for (const exercise of exercises) {
@@ -103,6 +109,7 @@ async function loadPlan() {
   elements.content.hidden = false;
 }
 
+// Draw the tracked joints/limbs over the video.
 function drawSkeleton(landmarks) {
   const canvas = elements.canvas;
   const video = elements.video;
@@ -115,6 +122,8 @@ function drawSkeleton(landmarks) {
   context.clearRect(0, 0, bounds.width, bounds.height);
   if (!landmarks || !video.videoWidth || !video.videoHeight) return;
 
+  // The video is shown with object-fit: cover, so apply the same scale/crop
+  // to map normalized landmark coords (0-1) onto the visible area.
   const scale = Math.max(bounds.width / video.videoWidth, bounds.height / video.videoHeight);
   const offsetX = (bounds.width - video.videoWidth * scale) / 2;
   const offsetY = (bounds.height - video.videoHeight * scale) / 2;
@@ -149,18 +158,21 @@ function drawSkeleton(landmarks) {
   }
 }
 
+// Per-frame loop: run pose detection on new video frames and update the rep count.
 function processFrame() {
   if (!cameraStream) return;
   if (!poseLandmarker || elements.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
     animationFrame = requestAnimationFrame(processFrame);
     return;
   }
+  // Skip if the video hasn't advanced to a new frame since last time
   if (elements.video.currentTime !== lastVideoTime) {
     lastVideoTime = elements.video.currentTime;
     const result = poseLandmarker.detectForVideo(elements.video, performance.now());
     const landmarks = result.landmarks?.[0];
     drawSkeleton(landmarks);
     if (landmarks && counter) {
+      // Prefer 3D world landmarks (real-world angles); fall back to 2D image landmarks
       const state = counter.update(result.worldLandmarks?.[0] || landmarks);
       setRepValue(state.repCount);
       const isSquat = counter.exerciseType === "squat";
@@ -221,6 +233,7 @@ async function startCamera() {
   elements.video.srcObject = stream;
   await elements.video.play();
 
+  // Load MediaPipe lazily so users who never turn on the camera don't download it
   const { FilesetResolver, PoseLandmarker } = await import(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs"
   );
@@ -286,6 +299,7 @@ elements.decrement.addEventListener("click", () => setRepValue(Number(elements.r
 elements.increment.addEventListener("click", () => setRepValue(Number(elements.reps.value) + 1, true));
 elements.reps.addEventListener("input", () => setRepValue(elements.reps.value, true));
 elements.reps.addEventListener("change", () => setRepValue(elements.reps.value, true));
+// Save the current set to the server as a WorkoutLog entry.
 elements.save.addEventListener("click", async () => {
   elements.save.disabled = true;
   elements.saveStatus.classList.remove("error");
@@ -316,6 +330,7 @@ elements.save.addEventListener("click", async () => {
     elements.save.disabled = false;
   }
 });
+// Release the camera when leaving the page
 window.addEventListener("pagehide", stopCamera);
 
 loadPlan().catch((error) => {

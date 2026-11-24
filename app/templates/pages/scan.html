@@ -58,6 +58,8 @@
         return;
     }
 
+    // Make a string safe to send over serial: strip the "|" delimiter, newlines
+    // and non-ASCII (the Arduino's display can't show them), then truncate.
     function serialField(value, maxLength) {
         return String(value || "")
             .replace(/[|\r\n\t]/g, " ")
@@ -90,6 +92,7 @@
         result.hidden = false;
     }
 
+    // Arduino asks for exercise N with "GET|<index>"; reply "X|<name>" or "E|<error>".
     async function handleExerciseRequest(line, writer) {
         const match = /^GET\|(\d+)$/.exec(line);
         if (!match) return false;
@@ -103,6 +106,8 @@
         return true;
     }
 
+    // Any other line from the reader should be a 14-hex-char fob UID.
+    // On a match we reply "P|<first name>|<exercise count>".
     async function handleSerialLine(line, writer) {
         if (await handleExerciseRequest(line, writer)) return;
         if (!/^[0-9a-fA-F]{14}$/.test(line)) {
@@ -159,6 +164,7 @@
                 if (done) {
                     break;
                 }
+                // Serial data arrives in arbitrary chunks; buffer until we have full lines
                 pending += decoder.decode(value, { stream: true });
                 const lines = pending.split(/\r?\n/);
                 pending = lines.pop();
